@@ -3,9 +3,7 @@ package cma.redditrising.activity;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.TextView;
 
 import com.google.gson.Gson;
@@ -19,6 +17,9 @@ import cma.redditrising.R;
 import cma.redditrising.network.RedditNetworkUtil;
 import cma.redditrising.object.RedditObject;
 import cma.redditrising.util.RLog;
+import io.reactivex.Flowable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 
 public class UriHandlerActivity extends Activity {
 
@@ -40,66 +41,46 @@ public class UriHandlerActivity extends Activity {
         Uri uri = intent.getData();
         final String code = uri.getQueryParameter( "code" );
 
-        new AsyncTask() {
-            @Override
-            protected String doInBackground( Object[] params ) {
-                try {
-                    RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
-                    String tokenResponse = redditNetworkUtil.getRedditAuthToken( code );
-                    JSONObject json = new JSONObject( tokenResponse );
-                    String token = json.getString( "access_token" );
-                    redditNetworkUtil.setToken( token );
-                    return redditNetworkUtil.getSubscribedSubreddits();
-                } catch ( Exception e ) {
-                    RLog.e( e );
-                }
-                return null;
+        Flowable.fromCallable( () -> {
+            try {
+                RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
+                String tokenResponse = redditNetworkUtil.getRedditAuthToken( code );
+                JSONObject json = new JSONObject( tokenResponse );
+                String token = json.getString( "access_token" );
+                redditNetworkUtil.setToken( token );
+                return redditNetworkUtil.getSubscribedSubreddits();
+            } catch ( Exception e ) {
+                RLog.e( e );
             }
+            return null;
 
-            @Override
-            protected void onPostExecute( Object o ) {
-                super.onPostExecute( o );
-                Gson gson = new Gson();
-                RedditObject redditObject = gson.fromJson( (String) o, RedditObject.class );
-                final List<RedditObject> children = redditObject.getData().getChildren();
+        } ).subscribeOn( Schedulers.io() ).observeOn( AndroidSchedulers.mainThread() ).subscribe( s -> {
+            Gson gson = new Gson();
+            RedditObject redditObject = gson.fromJson( s, RedditObject.class );
+            final List<RedditObject> children = redditObject.getData().getChildren();
 
-                StringBuilder sb = new StringBuilder();
-                for ( RedditObject child : children ) {
-                    sb.append( child.getData().getDisplayName() );
-                    sb.append( "\n" );
-                }
-                textView.setText( sb.toString() );
-
-                textView.setOnClickListener( new View.OnClickListener() {
-                    @Override
-                    public void onClick( View v ) {
-                        goToSubreddit( children.get( 0 ).getData().getDisplayName() );
-                    }
-                } );
+            StringBuilder sb = new StringBuilder();
+            for ( RedditObject child : children ) {
+                sb.append( child.getData().getDisplayName() );
+                sb.append( "\n" );
             }
-        }.execute();
+            textView.setText( sb.toString() );
+
+            textView.setOnClickListener( v -> goToSubreddit( children.get( 0 ).getData().getDisplayName() ) );
+        } );
     }
 
     private void goToSubreddit( final String subreddit ) {
-        new AsyncTask<String, Void, String>() {
-
-            @Override
-            protected String doInBackground( String... strings ) {
-                try {
-                    RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
-                    return redditNetworkUtil.getRisingPosts( subreddit );
-                } catch ( IOException e ) {
-                    RLog.e( e );
-                }
-                return null;
+        Flowable.fromCallable( () -> {
+            try {
+                RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
+                return redditNetworkUtil.getRisingPosts( subreddit );
+            } catch ( IOException e ) {
+                RLog.e( e );
             }
-
-            @Override
-            protected void onPostExecute( String s ) {
-                super.onPostExecute( s );
-                RLog.d( s );
-            }
-        }.execute();
+            return null;
+        } ).subscribeOn( Schedulers.io() ).observeOn( AndroidSchedulers.mainThread() ).subscribe( s -> {
+            RLog.d( s );
+        } );
     }
-
 }
