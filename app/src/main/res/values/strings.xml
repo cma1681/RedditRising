@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">RedditRising</string>
+    <string name="failed_login_click">Failed to log-in</string>
+    <string name="login_fetch_subreddits">Log in to fetch subreddits</string>
+</resources>
