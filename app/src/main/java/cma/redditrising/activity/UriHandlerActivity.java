@@ -17,9 +17,6 @@ import cma.redditrising.R;
 import cma.redditrising.network.RedditNetworkUtil;
 import cma.redditrising.object.RedditObject;
 import cma.redditrising.util.RLog;
-import io.reactivex.Flowable;
-import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.schedulers.Schedulers;
 
 public class UriHandlerActivity extends Activity {
 
@@ -41,46 +38,41 @@ public class UriHandlerActivity extends Activity {
         Uri uri = intent.getData();
         final String code = uri.getQueryParameter( "code" );
 
-        Flowable.fromCallable( () -> {
-            try {
-                RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
-                String tokenResponse = redditNetworkUtil.getRedditAuthToken( code );
-                JSONObject json = new JSONObject( tokenResponse );
+        try {
+            RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
+            redditNetworkUtil.getRedditAuthToken( code ).subscribe( s -> {
+                JSONObject json = new JSONObject( s );
                 String token = json.getString( "access_token" );
                 redditNetworkUtil.setToken( token );
-                return redditNetworkUtil.getSubscribedSubreddits();
-            } catch ( Exception e ) {
-                RLog.e( e );
-            }
-            return null;
 
-        } ).subscribeOn( Schedulers.io() ).observeOn( AndroidSchedulers.mainThread() ).subscribe( s -> {
-            Gson gson = new Gson();
-            RedditObject redditObject = gson.fromJson( s, RedditObject.class );
-            final List<RedditObject> children = redditObject.getData().getChildren();
+                redditNetworkUtil.getSubscribedSubreddits().subscribe( subs -> {
+                    Gson gson = new Gson();
+                    RedditObject redditObject = gson.fromJson( subs, RedditObject.class );
+                    final List<RedditObject> children = redditObject.getData().getChildren();
 
-            StringBuilder sb = new StringBuilder();
-            for ( RedditObject child : children ) {
-                sb.append( child.getData().getDisplayName() );
-                sb.append( "\n" );
-            }
-            textView.setText( sb.toString() );
+                    StringBuilder sb = new StringBuilder();
+                    for ( RedditObject child : children ) {
+                        sb.append( child.getData().getDisplayName() );
+                        sb.append( "\n" );
+                    }
+                    textView.setText( sb.toString() );
 
-            textView.setOnClickListener( v -> goToSubreddit( children.get( 0 ).getData().getDisplayName() ) );
-        } );
+                    textView.setOnClickListener( v -> goToSubreddit( children.get( 0 ).getData().getDisplayName() ) );
+                } );
+            } );
+        } catch ( Exception e ) {
+            RLog.e( e );
+        }
     }
 
     private void goToSubreddit( final String subreddit ) {
-        Flowable.fromCallable( () -> {
-            try {
-                RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
-                return redditNetworkUtil.getRisingPosts( subreddit );
-            } catch ( IOException e ) {
-                RLog.e( e );
-            }
-            return null;
-        } ).subscribeOn( Schedulers.io() ).observeOn( AndroidSchedulers.mainThread() ).subscribe( s -> {
-            RLog.d( s );
-        } );
+        try {
+            RedditNetworkUtil redditNetworkUtil = RedditNetworkUtil.getInstance();
+            redditNetworkUtil.getRisingPosts( subreddit ).subscribe( s -> {
+                RLog.d( s );
+            } );
+        } catch ( IOException e ) {
+            RLog.e( e );
+        }
     }
 }

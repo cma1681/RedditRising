@@ -1,52 +1,25 @@
 package cma.redditrising.network;
 
-import java.io.IOException;
-import java.util.Map;
-
-import cma.redditrising.util.RLog;
-import okhttp3.FormBody;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
+import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+import retrofit2.converter.scalars.ScalarsConverterFactory;
 
 public abstract class NetworkUtil {
 
-    private OkHttpClient okHttpClient = getOkHttpClient();
+    private String BASE_URL = "https://www.reddit.com/api/v1/";
 
-    protected String post( String url, Map<String, String> bodyParams ) throws IOException {
-        FormBody.Builder formBody = new FormBody.Builder();
-        for ( String key : bodyParams.keySet() ) {
-            formBody.add( key, bodyParams.get( key ) );
+    private Retrofit retrofit;
+
+    public Retrofit getRetrofit() {
+        if ( retrofit == null ) {
+            retrofit = new Retrofit.Builder()
+                    .baseUrl( BASE_URL )
+                    .addConverterFactory( ScalarsConverterFactory.create() )
+//                    .addConverterFactory( GsonConverterFactory.create() )
+                    .addCallAdapterFactory( RxJava2CallAdapterFactory.create() )
+                    .build();
         }
-        RequestBody body = formBody.build();
-
-        Request request = getRequestBuilder()
-                .url( url )
-                .post( body )
-                .build();
-
-        Response response = okHttpClient.newCall( request ).execute();
-        return response.body().string();
-    }
-
-    protected String get( String url ) throws IOException {
-        Request request = getRequestBuilder()
-                .url( url )
-                .get()
-                .build();
-
-        RLog.d( request.toString() );
-        Response response = okHttpClient.newCall( request ).execute();
-        return response.body().string();
-    }
-
-    public abstract OkHttpClient getOkHttpClient();
-
-    private Request.Builder getRequestBuilder() {
-        return new Request.Builder()
-                .addHeader( "User-Agent", "RedditRising/0.1 by cma1681" )
-                .addHeader( "Authorization", "bearer " + getToken() );
+        return retrofit;
     }
 
     protected abstract String getToken();

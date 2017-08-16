@@ -2,17 +2,13 @@ package cma.redditrising.network;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.Map;
 
 import cma.redditrising.BuildConfig;
-import okhttp3.Authenticator;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.Credentials;
 import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.Route;
 
 public class RedditNetworkUtil extends NetworkUtil {
 
@@ -20,20 +16,26 @@ public class RedditNetworkUtil extends NetworkUtil {
     private static final String REDDIT_CLIENT_SECRET = "";
 
     private static final String REDDIT_RESPONSE_TYPE = "code"; //Either "code" or "token", seems like "code" works
-    private static final String REDDIT_BASE_URL = "https://www.reddit.com/api/v1/";
-    private static final String REDDIT_OAUTH_BASE_URL = "https://oauth.reddit.com/";
     private static final String REDIRECT_URL = "redditrising://launch";
     private static final String REDDIT_PERMISSIONS_SCOPE = "mysubreddits,read"; // CSV of scope
     private String token;
 
     // TODO Look into Dagger or some dependency injection
     private static RedditNetworkUtil INSTANCE = new RedditNetworkUtil();
+    private RedditApi redditApi;
 
     public static RedditNetworkUtil getInstance() {
         return INSTANCE;
     }
 
     private RedditNetworkUtil() {
+    }
+
+    private RedditApi getRedditApi() {
+        if ( redditApi == null ) {
+            redditApi = getRetrofit().create( RedditApi.class );
+        }
+        return redditApi;
     }
 
     /**
@@ -58,32 +60,25 @@ public class RedditNetworkUtil extends NetworkUtil {
         return httpUrl.url().toString();
     }
 
-    public String getRedditAuthToken( String code ) throws IOException { // TODO verify that state is the same uuid that was passed in
-        Map<String, String> requestParams = new HashMap<>();
-        requestParams.put( "grant_type", "authorization_code" );
-        requestParams.put( "code", code );
-        requestParams.put( "redirect_uri", REDIRECT_URL );
-        return post( REDDIT_BASE_URL + "access_token", requestParams );
+    public Observable<String> getRedditAuthToken( String code ) throws IOException { // TODO verify that state is the same uuid that was passed in
+        String credential = Credentials.basic( BuildConfig.REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET );
+
+        return getRedditApi().getAccessToken( credential, "authorization_code", code, REDIRECT_URL )
+                .subscribeOn( Schedulers.io() )
+                .observeOn( AndroidSchedulers.mainThread() );
     }
 
-    @Override
-    public OkHttpClient getOkHttpClient() {
-        return new OkHttpClient.Builder().authenticator( new Authenticator() {
-            @Override
-            public Request authenticate( Route route, Response response ) throws IOException {
-                String credential = Credentials.basic( BuildConfig.REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET );
-                return response.request().newBuilder().header( "Authorization", credential ).build();
-            }
-        } ).build();
+
+    public Observable<String> getSubscribedSubreddits() throws IOException {
+        return getRedditApi().loadSubscribedSubreddits( "bearer " + getToken() )
+                .subscribeOn( Schedulers.io() )
+                .observeOn( AndroidSchedulers.mainThread() );
     }
 
-    public String getSubscribedSubreddits() throws IOException {
-        return get( REDDIT_OAUTH_BASE_URL + "subreddits/mine/subscriber" );
-    }
-
-    public String getRisingPosts( String subreddit ) throws IOException {
-        String url = String.format( REDDIT_OAUTH_BASE_URL + "r/%s/rising", subreddit );
-        return get( url );
+    public Observable<String> getRisingPosts( String subreddit ) throws IOException {
+        return getRedditApi().getRisingPosts( subreddit, "bearer " + getToken() )
+                .subscribeOn( Schedulers.io() )
+                .observeOn( AndroidSchedulers.mainThread() );
     }
 
     public void setToken( String token ) {

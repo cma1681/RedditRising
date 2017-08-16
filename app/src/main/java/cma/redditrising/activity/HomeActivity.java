@@ -27,19 +27,16 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        loginButton.setOnClickListener( new View.OnClickListener() {
-            @Override
-            public void onClick( View view ) {
-                try {
-                    RedditNetworkUtil networkUtil = RedditNetworkUtil.getInstance();
-                    String redditAuthUrl = networkUtil.getRedditAuthUrl( UUID.randomUUID().toString() );
+        loginButton.setOnClickListener( view -> {
+            try {
+                RedditNetworkUtil networkUtil = RedditNetworkUtil.getInstance();
+                String redditAuthUrl = networkUtil.getRedditAuthUrl( UUID.randomUUID().toString() );
 
-                    Intent intent = new Intent( Intent.ACTION_VIEW, Uri.parse( redditAuthUrl ) );
-                    startActivity( intent );
-                } catch ( Exception e ) {
-                    Toast.makeText( getBaseContext(), R.string.failed_login_click, Toast.LENGTH_SHORT );
-                    RLog.e( e, "Failed to handle log-in click" );
-                }
+                Intent intent = new Intent( Intent.ACTION_VIEW, Uri.parse( redditAuthUrl ) );
+                startActivity( intent );
+            } catch ( Exception e ) {
+                Toast.makeText( getBaseContext(), R.string.failed_login_click, Toast.LENGTH_SHORT );
+                RLog.e( e, "Failed to handle log-in click" );
             }
         } );
     }
